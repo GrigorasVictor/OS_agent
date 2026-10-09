@@ -1,0 +1,13 @@
+venv/
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+bin/
+lib/
+share/
+include/

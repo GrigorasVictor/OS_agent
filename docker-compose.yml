@@ -1,0 +1,84 @@
+version: '3.8'
+
+name: 'ASO'
+
+services:
+  ollama:
+    build:
+      context: .
+      dockerfile: microservices/ollama/Dockerfile
+      args:
+        MODEL: granite4:3b
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - OLLAMA_GPU_MEMORY_FRACTION=0.9
+      - OLLAMA_CONTEXT_LENGTH=12000
+      - MODEL=granite4:3b
+      - OLLAMA_DEBUG=1
+      - OLLAMA_KEEP_ALIVE=24h
+    volumes:
+      - ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - aso_net
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: microservices/mcp-server/Dockerfile
+    container_name: mcp-server
+    restart: unless-stopped
+    environment:
+      - MCP_NAME=System Administrator Tools
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - MCP_TRANSPORT=streamable-http
+    ports:
+      - "8010:8000" # host 8010 -> container 8000
+    volumes:
+      - "C:/Users/Victor/Documents:/host-project:ro"
+    networks:
+      - aso_net
+
+  adk-web:
+    build:
+      context: .
+      dockerfile: microservices/adk-agent/Dockerfile
+      args:
+        MODEL: granite4:3b
+    container_name: adk-web
+    restart: unless-stopped
+    environment:
+      - MCP_HOST=mcp-server
+      - MCP_PORT=8000
+      - MODEL=granite4:3b
+      - MODEL_NAME=granite4:3b
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_API_BASE=http://ollama:11434
+    ports:
+      - "8000:8000"
+    command: ["adk", "web", "--host", "0.0.0.0", "--port", "8000", "--log_level", "DEBUG"]
+    depends_on:
+      - mcp-server
+      - ollama
+    networks:
+      - aso_net
+
+networks:
+  aso_net:
+    driver: bridge
+
+volumes:
+  ollama:
